@@ -1,15 +1,14 @@
 import vtk
 
-
 def main():
     filename = "altitudes.txt"
     colors = vtk.vtkNamedColors()
 
     # To read from file
-    sizeX = 3001
-    sizeY = 3001
-    sizeZ = 1
-    dims = [sizeX, sizeY, sizeZ]
+    SIZE_X = 3001
+    SIZE_Y = 3001
+    SIZE_Z = 1
+    dims = [SIZE_X, SIZE_Y, SIZE_Z]
 
     radius = 6371009
 
@@ -17,7 +16,6 @@ def main():
     mapGrid.SetDimensions(dims)
 
     x = 0
-    y = 0
 
     points = vtk.vtkPoints()
 
@@ -26,33 +24,38 @@ def main():
         for line in f:
             x += 1
             y = 0
-            print(x)
             for i in line.split():
                 y += 1
                 altitude = radius + int(i)
-                longitude = y * (2.5 / sizeX - 1)
-                latitude = x * (2.5 / sizeY - 1)
+                longitude = y * (2.5 / (SIZE_Y - 1))
+                latitude = x * (2.5 / (SIZE_X - 1))
 
                 p = [0, 0, altitude]
 
                 transform = vtk.vtkTransform()
-                transform.RotateX(latitude)
-                transform.RotateY(longitude)
+                transform.RotateX(longitude)
+                transform.RotateY(latitude)
 
                 # Apply the transform to the point p
-                transform.TransformPoint(p)
+                p = transform.TransformPoint(p)
 
                 points.InsertNextPoint(p)
 
     mapGrid.SetPoints(points)
 
-    print(mapGrid)
+    lut = vtk.vtkLookupTable()
+    lut.SetNumberOfColors(16)
+    lut.SetTableRange(minA, maxA)
+    lut.Build()
 
     sgridMapper = vtk.vtkDataSetMapper()
     sgridMapper.SetInputData(mapGrid)
+
+    sgridMapper.SetLookupTable(lut)
+
     sgridActor = vtk.vtkActor()
     sgridActor.SetMapper(sgridMapper)
-    sgridActor.GetProperty().SetColor(colors.GetColor3d("black"))
+    sgridActor.GetProperty().SetColor(colors.GetColor3d("Peacock"))
 
     # Create the usual rendering stuff
     renderer = vtk.vtkRenderer()
