@@ -30,13 +30,12 @@ def main():
             for i in line.split():
                 y += 1
                 altitude = radius + int(i)
+                array.InsertNextValue(int(i))
 
                 longitude = y * (2.5 / (SIZE_Y - 1))
                 latitude = x * (2.5 / (SIZE_X - 1))
 
                 p = [0, 0, altitude]
-
-                array.InsertNextValue(altitude)
 
                 transform = vtk.vtkTransform()
                 transform.RotateX(longitude)
