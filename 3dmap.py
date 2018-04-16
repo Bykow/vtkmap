@@ -1,5 +1,6 @@
 import vtk
 
+
 def main():
     filename = "altitudes.txt"
     colors = vtk.vtkNamedColors()
@@ -15,6 +16,8 @@ def main():
     mapGrid = vtk.vtkStructuredGrid()
     mapGrid.SetDimensions(dims)
 
+    array = vtk.vtkIntArray()
+
     x = 0
 
     points = vtk.vtkPoints()
@@ -27,10 +30,13 @@ def main():
             for i in line.split():
                 y += 1
                 altitude = radius + int(i)
+
                 longitude = y * (2.5 / (SIZE_Y - 1))
                 latitude = x * (2.5 / (SIZE_X - 1))
 
                 p = [0, 0, altitude]
+
+                array.InsertNextValue(altitude)
 
                 transform = vtk.vtkTransform()
                 transform.RotateX(longitude)
@@ -42,20 +48,42 @@ def main():
                 points.InsertNextPoint(p)
 
     mapGrid.SetPoints(points)
+    mapGrid.GetPointData().SetScalars(array)
 
-    lut = vtk.vtkLookupTable()
-    lut.SetNumberOfColors(16)
-    lut.SetTableRange(minA, maxA)
+    a, b = array.GetValueRange()
+
+    lut = vtk.vtkColorTransferFunction()
+    lut.AddRGBPoint(a, 0.3, 1.0, 0.3)
+    lut.AddRGBPoint(a + (b - a) / 4, 0.5, 1.0, 0.5)
+    lut.AddRGBPoint(a + (b - a) / 2, 0.6, 0.4, 0)
+    lut.AddRGBPoint(b - (b - a) / 4, 0.8, 0.8, 0.8)
+    lut.AddRGBPoint(b, 1.0, 1.0, 1.0)
     lut.Build()
 
     sgridMapper = vtk.vtkDataSetMapper()
     sgridMapper.SetInputData(mapGrid)
 
     sgridMapper.SetLookupTable(lut)
+    sgridMapper.SetScalarRange(a, b)
+    sgridMapper.SetScalarModeToUsePointData()
+
+    # a colorbar to display the colormap
+    scalarBar = vtk.vtkScalarBarActor()
+    scalarBar.SetLookupTable(sgridMapper.GetLookupTable())
+    scalarBar.SetTitle("Altitude")
+    scalarBar.SetOrientationToVertical()
+    scalarBar.GetLabelTextProperty().SetColor(0, 0, 0)
+    scalarBar.GetTitleTextProperty().SetColor(0, 0, 0)
+
+    # position it in window
+    coord = scalarBar.GetPositionCoordinate()
+    coord.SetCoordinateSystemToNormalizedViewport()
+    coord.SetValue(0.85, 0.1)
+    scalarBar.SetWidth(.15)
+    scalarBar.SetHeight(.7)
 
     sgridActor = vtk.vtkActor()
     sgridActor.SetMapper(sgridMapper)
-    sgridActor.GetProperty().SetColor(colors.GetColor3d("Peacock"))
 
     # Create the usual rendering stuff
     renderer = vtk.vtkRenderer()
@@ -66,16 +94,10 @@ def main():
     iren.SetRenderWindow(renWin)
 
     renderer.AddActor(sgridActor)
-    renderer.SetBackground(colors.GetColor3d("Beige"))
+    renderer.AddActor(scalarBar)
+    renderer.SetBackground(colors.GetColor3d("Grey"))
     renderer.ResetCamera()
 
-    # camera = vtk.vtkCamera()
-    # camera.SetPosition(0, 0, 10000)
-    #
-    # renderer.SetActiveCamera(camera)
-    # renderer.GetActiveCamera().Elevation(60.0)
-    # renderer.GetActiveCamera().Azimuth(30.0)
-    # renderer.GetActiveCamera().Dolly(1.25)
     renWin.SetSize(1500, 1500)
 
     # Interact with the data.
