@@ -1,4 +1,5 @@
 import vtk
+import sys
 
 
 def main():
@@ -19,6 +20,9 @@ def main():
     x = 0
     y = 0
 
+    minZ = sys.maxsize
+    maxZ = -sys.maxsize - 1
+
     points = vtk.vtkPoints()
 
     with open(filename) as f:
@@ -26,12 +30,15 @@ def main():
         for line in f:
             x += 1
             y = 0
-            print(x)
             for i in line.split():
                 y += 1
                 altitude = radius + int(i)
-                longitude = y * (2.5 / sizeX - 1)
-                latitude = x * (2.5 / sizeY - 1)
+                if altitude < minZ:
+                    minZ = altitude
+                if altitude > maxZ:
+                    maxZ = altitude
+                longitude = y * (2.5 / (sizeX - 1))
+                latitude = x * (2.5 / (sizeY - 1))
 
                 p = [0, 0, altitude]
 
@@ -40,19 +47,30 @@ def main():
                 transform.RotateY(longitude)
 
                 # Apply the transform to the point p
-                transform.TransformPoint(p)
+                p = transform.TransformPoint(p)
 
                 points.InsertNextPoint(p)
 
     mapGrid.SetPoints(points)
 
-    print(mapGrid)
+    # Create    the    color    map
+    colorLookupTable = vtk.vtkLookupTable()
+    colorLookupTable.SetTableRange(minZ, maxZ)
+    colorLookupTable.Build()
+    #
+    # numPoints = mapGrid.GetNumberOfPoints()
+    # for i in range(0, numPoints):
+    #     point = mapGrid.GetPoint(i)
+    #     color = colorLookupTable.GetColor(point[2])
 
     sgridMapper = vtk.vtkDataSetMapper()
     sgridMapper.SetInputData(mapGrid)
+    sgridMapper.SetLookupTable(colorLookupTable)
+    sgridMapper.SetScalarModeToUsePointFieldData()
+
     sgridActor = vtk.vtkActor()
     sgridActor.SetMapper(sgridMapper)
-    sgridActor.GetProperty().SetColor(colors.GetColor3d("black"))
+    # sgridActor.GetProperty().SetColor(colors.GetColor3d("peacock"))
 
     # Create the usual rendering stuff
     renderer = vtk.vtkRenderer()
@@ -73,7 +91,7 @@ def main():
     # renderer.GetActiveCamera().Elevation(60.0)
     # renderer.GetActiveCamera().Azimuth(30.0)
     # renderer.GetActiveCamera().Dolly(1.25)
-    renWin.SetSize(1500, 1500)
+    renWin.SetSize(1000, 1000)
 
     # Interact with the data.
     renWin.Render()
