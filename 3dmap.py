@@ -1,3 +1,4 @@
+import math
 import vtk
 import sys
 
@@ -32,7 +33,8 @@ def isPointWater(array, idx):
     p7 = matrixToInline(minX, y)
     p8 = matrixToInline(minX, maxY)
 
-    return altitude == array.GetValue(p1) == array.GetValue(p2) == array.GetValue(p3) == array.GetValue(p4) == array.GetValue(p5) == array.GetValue(p6) == array.GetValue(p7) == array.GetValue(p8)
+    return altitude == array.GetValue(p1) == array.GetValue(p2) == array.GetValue(p3) == array.GetValue(
+        p4) == array.GetValue(p5) == array.GetValue(p6) == array.GetValue(p7) == array.GetValue(p8)
 
 
 def main():
@@ -67,14 +69,14 @@ def main():
 
                 array.InsertNextValue(int(i))
 
-                longitude = x * (2.5 / (SIZE_Y - 1))
-                latitude = y * (2.5 / (SIZE_X - 1))
+                longitude = 5 + y * (2.5 / SIZE_Y)
+                latitude = 45 + x * (2.5 / SIZE_X)
 
-                p = [0, 0, altitude]
+                longitude = math.radians(longitude)
+                latitude = math.radians(latitude)
 
-                transform = vtk.vtkTransform()
-                transform.RotateX(longitude)
-                transform.RotateY(latitude)
+                p = [altitude, latitude, longitude]
+                transform = vtk.vtkSphericalTransform()
 
                 # Apply the transform to the point p
                 p = transform.TransformPoint(p)
@@ -109,6 +111,8 @@ def main():
     addRGBPoint(1800, 237, 215, 187)
     # Snow from 2200 meters
     addRGBPoint(2200, 255, 255, 255)
+    addRGBPoint(b, 255, 255, 255)
+
     lut.Build()
 
     sgridMapper = vtk.vtkDataSetMapper()
@@ -127,12 +131,14 @@ def main():
     scalarBar.GetTitleTextProperty().SetColor(0, 0, 0)
     scalarBar.DrawBelowRangeSwatchOn()
     scalarBar.SetBelowRangeAnnotation("Water")
+    scalarBar.AnnotationTextScalingOn()
+    scalarBar.GetAnnotationTextProperty().SetColor(0, 0, 0)
     scalarBar.SetLabelFormat("%4.0f")
 
     # position it in window
     coord = scalarBar.GetPositionCoordinate()
     coord.SetCoordinateSystemToNormalizedViewport()
-    coord.SetValue(0.85, 0.1)
+    coord.SetValue(0.82, 0.1)
     scalarBar.SetWidth(.15)
     scalarBar.SetHeight(.7)
 
