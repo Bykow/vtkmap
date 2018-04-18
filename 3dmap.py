@@ -1,14 +1,44 @@
 import vtk
 import sys
 
+# To read from file
+SIZE_X = 3001
+SIZE_Y = 3001
+
+
+def isPointWater(array, idx):
+    def matrixToInline(x, y):
+        return x + SIZE_X * y
+
+    def inlineToMatrix(idx):
+        x = idx % SIZE_X
+        y = idx // SIZE_X
+        return x, y
+
+    x, y = inlineToMatrix(idx)
+    minX = max(0, x - 1)
+    maxX = min(x + 1, SIZE_X - 1)
+    minY = max(0, y - 1)
+    maxY = min(y + 1, SIZE_Y - 1)
+
+    altitude = array.GetValue(idx)
+
+    p1 = matrixToInline(maxX, minY)
+    p2 = matrixToInline(maxX, y)
+    p3 = matrixToInline(maxX, maxY)
+    p4 = matrixToInline(x, minY)
+    p5 = matrixToInline(x, maxY)
+    p6 = matrixToInline(minX, minY)
+    p7 = matrixToInline(minX, y)
+    p8 = matrixToInline(minX, maxY)
+
+    return altitude == array.GetValue(p1) == array.GetValue(p2) == array.GetValue(p3) == array.GetValue(p4) == array.GetValue(p5) == array.GetValue(p6) == array.GetValue(p7) == array.GetValue(p8)
+
 
 def main():
     filename = "altitudes.txt"
     colors = vtk.vtkNamedColors()
 
-    # To read from file
-    SIZE_X = 3001
-    SIZE_Y = 3001
     SIZE_Z = 1
     dims = [SIZE_X, SIZE_Y, SIZE_Z]
 
@@ -35,15 +65,10 @@ def main():
                 y += 1
                 altitude = radius + int(i)
 
-                if altitude < minZ:
-                    minZ = altitude
-                if altitude > maxZ:
-                    maxZ = altitude
-
                 array.InsertNextValue(int(i))
 
-                longitude = y * (2.5 / (SIZE_Y - 1))
-                latitude = x * (2.5 / (SIZE_X - 1))
+                longitude = x * (2.5 / (SIZE_Y - 1))
+                latitude = y * (2.5 / (SIZE_X - 1))
 
                 p = [0, 0, altitude]
 
@@ -57,35 +82,33 @@ def main():
                 points.InsertNextPoint(p)
 
     mapGrid.SetPoints(points)
-    mapGrid.GetPointData().SetScalars(array)
 
     a, b = array.GetValueRange()
 
-#     # Create    the    color    map
-#     colorLookupTable = vtk.vtkLookupTable()
-#     colorLookupTable.SetTableRange(minZ, maxZ)
-#     colorLookupTable.Build()
-#     #
-#     # numPoints = mapGrid.GetNumberOfPoints()
-#     # for i in range(0, numPoints):
-#     #     point = mapGrid.GetPoint(i)
-#     #     color = colorLookupTable.GetColor(point[2])
-#
-#     sgridMapper = vtk.vtkDataSetMapper()
-#     sgridMapper.SetInputData(mapGrid)
-#     sgridMapper.SetLookupTable(colorLookupTable)
-#     sgridMapper.SetScalarModeToUsePointFieldData()
-#
-#     sgridActor = vtk.vtkActor()
-#     sgridActor.SetMapper(sgridMapper)
-#     # sgridActor.GetProperty().SetColor(colors.GetColor3d("peacock"))
+    waterIndexes = []
+    for i in range(0, mapGrid.GetNumberOfPoints()):
+        if isPointWater(array, i):
+            waterIndexes.append(i)
+
+    for index in waterIndexes:
+        array.SetValue(index, 0)
+
+    mapGrid.GetPointData().SetScalars(array)
+
+    def addRGBPoint(p, r, g, b):
+        lut.AddRGBPoint(p, r / 255, g / 255, b / 255)
 
     lut = vtk.vtkColorTransferFunction()
-    lut.AddRGBPoint(a, 0.3, 1.0, 0.3)
-    lut.AddRGBPoint(a + (b - a) / 4, 0.5, 1.0, 0.5)
-    lut.AddRGBPoint(a + (b - a) / 2, 0.6, 0.4, 0)
-    lut.AddRGBPoint(b - (b - a) / 4, 0.8, 0.8, 0.8)
-    lut.AddRGBPoint(b, 1.0, 1.0, 1.0)
+    # The water has value 0 which is below the color range
+    lut.SetBelowRangeColor(64 / 255, 61 / 255, 128 / 255)
+    lut.SetUseBelowRangeColor(True)
+
+    # Minimal altitude is forest
+    addRGBPoint(a, 53, 96, 48)
+    # No forest after 1800 meters
+    addRGBPoint(1800, 237, 215, 187)
+    # Snow from 2200 meters
+    addRGBPoint(2200, 255, 255, 255)
     lut.Build()
 
     sgridMapper = vtk.vtkDataSetMapper()
@@ -102,6 +125,9 @@ def main():
     scalarBar.SetOrientationToVertical()
     scalarBar.GetLabelTextProperty().SetColor(0, 0, 0)
     scalarBar.GetTitleTextProperty().SetColor(0, 0, 0)
+    scalarBar.DrawBelowRangeSwatchOn()
+    scalarBar.SetBelowRangeAnnotation("Water")
+    scalarBar.SetLabelFormat("%4.0f")
 
     # position it in window
     coord = scalarBar.GetPositionCoordinate()
@@ -125,7 +151,6 @@ def main():
     renderer.AddActor(scalarBar)
     renderer.SetBackground(colors.GetColor3d("Grey"))
     renderer.ResetCamera()
-
 
     renWin.SetSize(1000, 1000)
 
