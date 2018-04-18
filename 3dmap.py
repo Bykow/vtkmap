@@ -53,9 +53,6 @@ def main():
 
     x = 0
 
-    minZ = sys.maxsize
-    maxZ = -sys.maxsize - 1
-
     points = vtk.vtkPoints()
 
     with open(filename) as f:
