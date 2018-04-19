@@ -1,3 +1,9 @@
+"""
+    VTK Lab 03 - Map representation in 3D
+    Authors : Lawrence Stalder, Guillaume Milani
+    Date : Apr 19 2018
+"""
+
 import math
 import vtk
 
@@ -18,7 +24,7 @@ EARTH_RADIUS = 6371009
 FOREST_LIMIT = 1800
 SNOW_LIMIT = 2200
 SEA_LEVEL = 0
-CAMERA_ALTITUDE = 1000000
+CAMERA_ALTITUDE = 750000
 
 
 def loadingBar(current, total, info):
