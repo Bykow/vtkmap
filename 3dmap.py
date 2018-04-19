@@ -62,9 +62,12 @@ def main():
             y = 0
             for i in line.split():
                 y += 1
-                altitude = radius + int(i)
 
-                array.InsertNextValue(int(i))
+                # High water mode
+                # currentValue = max(370, int(i))
+                currentValue = int(i)
+                altitude = radius + currentValue
+                array.InsertNextValue(currentValue)
 
                 longitude = 5 + y * (2.5 / SIZE_Y)
                 latitude = 45 + x * (2.5 / SIZE_X)
