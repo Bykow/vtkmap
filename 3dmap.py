@@ -1,16 +1,47 @@
 import math
 import vtk
-import sys
 
+FILENAME = "altitudes.txt"
 # Size of the data to read
 SIZE_X = 3001
 SIZE_Y = 3001
+SIZE_Z = 1
+
+# Latitude and longitude bounds
+MIN_LONG = 5.0
+MAX_LONG = 7.5
+MIN_LAT = 45.0
+MAX_LAT = 47.5
+
+# Different parameters, in meters above sea
+EARTH_RADIUS = 6371009
+FOREST_LIMIT = 1800
+SNOW_LIMIT = 2200
+SEA_LEVEL = 0
+CAMERA_ALTITUDE = 1000000
 
 
 def loadingBar(current, total, info):
+    """
+       Displays a loading bar with a custom message
+
+        :param current: current value
+        :param total: total number of values
+        :param infos: message to display next to the loading bar
+        """
     if current % int(total / 100) == 0:
         loaded = int(current // int(total / 100))
         print('[' + '#' * loaded + '-' * (100 - loaded) + ']' + str(loaded) + '% ' + info)
+
+
+def sphericalToCartesian(r, phi, theta):
+    phi = math.radians(phi)
+    theta = math.radians(theta)
+    return (
+        r * math.sin(phi) * math.cos(theta),
+        r * math.sin(phi) * math.sin(theta),
+        r * math.cos(phi)
+    )
 
 
 def isPointWater(array, idx):
@@ -21,6 +52,7 @@ def isPointWater(array, idx):
     :param idx: index to check
     :return: boolean, true if water, false otherwise
     """
+
     def matrixToInline(x, y):
         """
         Convert a matrix (n,m) representation to linear array
@@ -42,7 +74,7 @@ def isPointWater(array, idx):
         y = idx // SIZE_X
         return x, y
 
-    # Computing edges values to avoid out of bounds efect
+    # Computing edges values to avoid out of bounds effect
     x, y = inlineToMatrix(idx)
     minX = max(0, x - 1)
     maxX = min(x + 1, SIZE_X - 1)
@@ -68,27 +100,23 @@ def isPointWater(array, idx):
 
 
 def main():
-    filename = "altitudes.txt"
-    colors = vtk.vtkNamedColors()
+    namedColors = vtk.vtkNamedColors()
+    sphericalTransform = vtk.vtkSphericalTransform()
 
-    radius = 6371009
-
-    SIZE_Z = 1
     dims = [SIZE_X, SIZE_Y, SIZE_Z]
 
     # Structured Grid because space between points is always the same
-    mapGrid = vtk.vtkStructuredGrid()
-    mapGrid.SetDimensions(dims)
+    structuredGrid = vtk.vtkStructuredGrid()
+    structuredGrid.SetDimensions(dims)
 
     # Points to insert into Structured Grid
     points = vtk.vtkPoints()
 
-    # Array that saves only the heights, uses for color
+    # Array that saves only the heights, used for color
     heights = vtk.vtkIntArray()
 
     x = 0
-
-    with open(filename) as f:
+    with open(FILENAME) as f:
         next(f)
         for line in f:
             loadingBar(x, SIZE_X, 'Loading file')
@@ -98,37 +126,33 @@ def main():
             for i in line.split():
                 y += 1
 
-                # High water mode
-                # currentValue = max(370, int(i))
-                currentValue = int(i)
-                height = radius + currentValue
+                # Allows to modify the sea level
+                currentValue = max(SEA_LEVEL, int(i))
+                height = EARTH_RADIUS + currentValue
                 heights.InsertNextValue(currentValue)
 
-                longitude = 5 + y * (2.5 / SIZE_Y)
-                latitude = 45 + x * (2.5 / SIZE_X)
+                longitude = MIN_LONG + y * ((MAX_LONG - MIN_LONG) / SIZE_Y)
+                latitude = MIN_LAT + x * ((MAX_LAT - MIN_LAT) / SIZE_X)
 
-                longitude = math.radians(longitude)
-                latitude = math.radians(latitude)
-
-                p = [height, latitude, longitude]
+                p = [height, math.radians(latitude), math.radians(longitude)]
                 # Applies a spherical transform to the point, given a distance (height)
                 # and two angles (longitude, latitude) expressed in radians
-                transform = vtk.vtkSphericalTransform()
 
                 # Apply the transform to the point p
-                p = transform.TransformPoint(p)
+                p = sphericalTransform.TransformPoint(p)
 
                 points.InsertNextPoint(p)
 
-    mapGrid.SetPoints(points)
+    structuredGrid.SetPoints(points)
 
     # Get the range (min, max) values of the array
     a, b = heights.GetValueRange()
 
     # Water detection, we save a new array of index to modify after compute of said points
     waterIndexes = []
-
-    for i in range(0, mapGrid.GetNumberOfPoints()):
+    numberOfPoints = structuredGrid.GetNumberOfPoints()
+    for i in range(0, numberOfPoints):
+        loadingBar(i, numberOfPoints, 'Detecting water')
         if isPointWater(heights, i):
             waterIndexes.append(i)
 
@@ -136,11 +160,11 @@ def main():
     for index in waterIndexes:
         heights.SetValue(index, 0)
 
-    mapGrid.GetPointData().SetScalars(heights)
+    structuredGrid.GetPointData().SetScalars(heights)
 
     def addRGBPoint(p, r, g, b):
         """
-        Adds a RGB point to the lookup table. Devides the color by 255
+        Adds a RGB point to the lookup table. Divides the color by 255
         Example: (3000, 45, 45, 45)
 
         :param p: point (height)
@@ -152,31 +176,31 @@ def main():
         lut.AddRGBPoint(p, r / 255, g / 255, b / 255)
 
     lut = vtk.vtkColorTransferFunction()
-    # The water has value 0 which is below the color range
+    # The water scalars has a value 0 which is below the color range
     lut.SetBelowRangeColor(64 / 255, 61 / 255, 128 / 255)
     lut.SetUseBelowRangeColor(True)
 
     # Minimal altitude is forest
     addRGBPoint(a, 53, 96, 48)
-    # No forest after 1800 meters
-    addRGBPoint(1800, 237, 215, 187)
-    # Snow from 2200 meters
-    addRGBPoint(2200, 255, 255, 255)
+    # Forest limit
+    addRGBPoint(FOREST_LIMIT, 237, 215, 187)
+    # Snow limit
+    addRGBPoint(SNOW_LIMIT, 255, 255, 255)
     # Upper bound of scale
     addRGBPoint(b, 255, 255, 255)
 
     lut.Build()
 
-    sgridMapper = vtk.vtkDataSetMapper()
-    sgridMapper.SetInputData(mapGrid)
+    structuredGridMapper = vtk.vtkDataSetMapper()
+    structuredGridMapper.SetInputData(structuredGrid)
 
-    sgridMapper.SetLookupTable(lut)
-    sgridMapper.SetScalarRange(a, b)
-    sgridMapper.SetScalarModeToUsePointData()
+    structuredGridMapper.SetLookupTable(lut)
+    structuredGridMapper.SetScalarRange(a, b)
+    structuredGridMapper.SetScalarModeToUsePointData()
 
-    # a colorbar to display the colormap
+    # A colorbar to display the colormap
     scalarBar = vtk.vtkScalarBarActor()
-    scalarBar.SetLookupTable(sgridMapper.GetLookupTable())
+    scalarBar.SetLookupTable(structuredGridMapper.GetLookupTable())
     scalarBar.SetTitle("Altitude")
     scalarBar.SetOrientationToVertical()
     scalarBar.GetLabelTextProperty().SetColor(0, 0, 0)
@@ -194,8 +218,8 @@ def main():
     scalarBar.SetWidth(.15)
     scalarBar.SetHeight(.7)
 
-    sgridActor = vtk.vtkActor()
-    sgridActor.SetMapper(sgridMapper)
+    structuredGridActor = vtk.vtkActor()
+    structuredGridActor.SetMapper(structuredGridMapper)
 
     # Create the usual rendering stuff
     renderer = vtk.vtkRenderer()
@@ -206,26 +230,27 @@ def main():
     iren = vtk.vtkRenderWindowInteractor()
     iren.SetRenderWindow(renWin)
 
-    renderer.AddActor(sgridActor)
+    renderer.AddActor(structuredGridActor)
     renderer.AddActor(scalarBar)
-    renderer.SetBackground(colors.GetColor3d("Grey"))
+    renderer.SetBackground(namedColors.GetColor3d("Grey"))
 
     camera = vtk.vtkCamera()
-    r = radius
-    phi = math.radians(46.25)
-    theta = math.radians(6.25)
-    camera.SetFocalPoint(
-        r * math.sin(phi) * math.cos(theta),
-        r * math.sin(phi) * math.sin(theta),
-        r * math.cos(phi))
 
-    r = radius * 1.5
-    phi = math.radians(46.25)
-    theta = math.radians(6.25)
-    camera.SetPosition(
-        r * math.sin(phi) * math.cos(theta),
-        r * math.sin(phi) * math.sin(theta),
-        r * math.cos(phi))
+    # The focal point is the center of the map
+    center = [EARTH_RADIUS,
+              math.radians(MIN_LAT + (MAX_LAT - MIN_LAT) / 2.0),
+              math.radians(MIN_LONG + (MAX_LONG - MIN_LONG) / 2.0)
+              ]
+
+    camera.SetFocalPoint(sphericalTransform.TransformPoint(center))
+
+    # The camera is positioned in front of the center of the map
+    center[0] += CAMERA_ALTITUDE
+
+    camera.SetPosition(sphericalTransform.TransformPoint(center))
+
+    # Rotate the camera to display the map correctly
+    camera.Roll(-94)
 
     renderer.SetActiveCamera(camera)
     renderer.ResetCameraClippingRange()
