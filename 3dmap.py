@@ -7,6 +7,12 @@ SIZE_X = 3001
 SIZE_Y = 3001
 
 
+def loadingBar(current, total, info):
+    if current % int(total / 100) == 0:
+        loaded = int(current // int(total / 100))
+        print('[' + '#' * loaded + '-' * (100 - loaded) + ']' + str(loaded) + '% ' + info)
+
+
 def isPointWater(array, idx):
     def matrixToInline(x, y):
         return x + SIZE_X * y
@@ -58,9 +64,7 @@ def main():
     with open(filename) as f:
         next(f)
         for line in f:
-            if (x % int(SIZE_X/100) == 0):
-                loaded = int(x // int(SIZE_X/100))
-                print('[' + '#' * loaded + '-' * (100 - loaded) + ']' + str(loaded) + '% read from file')
+            loadingBar(x, SIZE_X, 'Loading file')
             x += 1
             y = 0
             for i in line.split():
@@ -91,9 +95,11 @@ def main():
     a, b = array.GetValueRange()
 
     waterIndexes = []
-    for i in range(0, mapGrid.GetNumberOfPoints()):
-        if isPointWater(array, i):
-            waterIndexes.append(i)
+    numberOfPoints = mapGrid.GetNumberOfPoints()
+    # for i in range(0, numberOfPoints):
+    #     loadingBar(i, numberOfPoints, 'Checking water')
+    #     if isPointWater(array, i):
+    #         waterIndexes.append(i)
 
     for index in waterIndexes:
         array.SetValue(index, 0)
@@ -151,9 +157,6 @@ def main():
     # Create the usual rendering stuff
     renderer = vtk.vtkRenderer()
 
-    camera = renderer.GetActiveCamera()
-    camera.Roll(-90)
-
     renWin = vtk.vtkRenderWindow()
     renWin.AddRenderer(renderer)
 
@@ -163,7 +166,26 @@ def main():
     renderer.AddActor(sgridActor)
     renderer.AddActor(scalarBar)
     renderer.SetBackground(colors.GetColor3d("Grey"))
-    renderer.ResetCamera()
+
+    camera = vtk.vtkCamera()
+    r = radius
+    phi = math.radians(46.25)
+    theta = math.radians(6.25)
+    camera.SetFocalPoint(
+        r * math.sin(phi) * math.cos(theta),
+        r * math.sin(phi) * math.sin(theta),
+        r * math.cos(phi))
+
+    r = radius * 1.5
+    phi = math.radians(46.25)
+    theta = math.radians(6.25)
+    camera.SetPosition(
+        r * math.sin(phi) * math.cos(theta),
+        r * math.sin(phi) * math.sin(theta),
+        r * math.cos(phi))
+
+    renderer.SetActiveCamera(camera)
+    renderer.ResetCameraClippingRange()
 
     renWin.SetSize(1000, 1000)
 
