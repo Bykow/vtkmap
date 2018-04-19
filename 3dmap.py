@@ -58,6 +58,9 @@ def main():
     with open(filename) as f:
         next(f)
         for line in f:
+            if (x % int(SIZE_X/100) == 0):
+                loaded = int(x // int(SIZE_X/100))
+                print('[' + '#' * loaded + '-' * (100 - loaded) + ']' + str(loaded) + '% read from file')
             x += 1
             y = 0
             for i in line.split():
@@ -147,6 +150,10 @@ def main():
 
     # Create the usual rendering stuff
     renderer = vtk.vtkRenderer()
+
+    camera = renderer.GetActiveCamera()
+    camera.Roll(-90)
+
     renWin = vtk.vtkRenderWindow()
     renWin.AddRenderer(renderer)
 
